@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 
@@ -68,6 +69,50 @@ class _MyDashboardState extends State<MyHomePage> {
 
   List<Text> get textMessages => testTopic.map<Text>((e) => Text(e));
 
+  FlutterLocalNotificationsPlugin noti;
+
+  Future showNotification(String title, String body) async {
+    var androidPlatformChannelSpecifics = new AndroidNotificationDetails(
+        'your channel id', 'your channel name', 'your channel description',
+        importance: Importance.Max, priority: Priority.High);
+    var iOSPlatformChannelSpecifics = new IOSNotificationDetails();
+    var platformChannelSpecifics = new NotificationDetails(
+        androidPlatformChannelSpecifics, iOSPlatformChannelSpecifics);
+    await noti.show(
+      0,
+      title,
+      body,
+      platformChannelSpecifics,
+      payload: 'Default_Sound',
+    );
+  }
+
+  Future onSelectNotification(String payload) {
+    return showDialog(
+        context: this.context,
+        builder: (context) => new AlertDialog(
+              title: Text("dd"),
+              content: Text(payload),
+            ));
+    // Navigator.of(context).push(MaterialPageRoute(builder: (_) {
+    //   return NewScreen(
+    //     payload: payload,
+    //   );
+    // }));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    var androidSettings =
+        new AndroidInitializationSettings("@mipmap/ic_launcher");
+    var iosSettings = new IOSInitializationSettings();
+    var settings = new InitializationSettings(androidSettings, iosSettings);
+
+    noti = FlutterLocalNotificationsPlugin();
+    noti.initialize(settings, onSelectNotification: this.onSelectNotification);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -120,6 +165,8 @@ class _MyDashboardState extends State<MyHomePage> {
                                 final payload =
                                     MqttPublishPayload.bytesToStringAsString(
                                         message.payload.message);
+
+                                this.showNotification("title", payload);
 
                                 setState(() {
                                   testTopic.add(payload);
