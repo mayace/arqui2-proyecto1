@@ -56,6 +56,8 @@ class _MyDashboardState extends State<MyHomePage> {
 
   MqttServerClient client;
 
+  var carritoEncendido = false;
+
   bool get isConnected => client == null
       ? false
       : client.connectionStatus.state == MqttConnectionState.connected;
@@ -129,6 +131,24 @@ class _MyDashboardState extends State<MyHomePage> {
                             }
                           }),
                 Text(this.connectionState.toString())
+              ],
+            ),
+            Row(
+              children: [
+                Switch(
+                    value: this.carritoEncendido,
+                    onChanged: (val) {
+                      setState(() {
+                        this.carritoEncendido = val;
+                      });
+
+                      final pubTopic = "arqui2/proyecto1/carrito";
+                      final builder = MqttClientPayloadBuilder();
+                      builder.addString(val ? 'on' : "off");
+                      client.publishMessage(
+                          pubTopic, MqttQos.atLeastOnce, builder.payload);
+                    }),
+                Text(this.carritoEncendido ? "Encendido" : "Apagado")
               ],
             ),
             Expanded(
