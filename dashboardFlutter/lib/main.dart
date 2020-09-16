@@ -55,7 +55,33 @@ class MyHomePage extends StatefulWidget {
 class _MyDashboardState extends State<MyHomePage> {
   var testTopic = [];
 
-  MqttServerClient client;
+  var isMqttConnected = false;
+
+  static const MQTT_SERVER = "mqtt.thingspeak.com";
+  static const MQTT_CLIENT_ID = "movil_client";
+  static const MQTT_USER = "movil_user";
+  static const MQTT_KEY = "RXRMKFZ36GMDVRGB";
+
+  static const MQTT_CANALES = {
+    "DatosArduino": {
+      "channelId": 1117472,
+      "writeKey": "8NCUJ7OGZ0KS1Q5F",
+      "readKey": "IREIF7337EH8HWYL"
+    },
+    "Promedios": {
+      "channelId": 1135979,
+      "writeKey": "AQ0XIG183CO29RDF",
+      "readKey": "AG9TYKD91EIYP061"
+    },
+    "Peticiones": {
+      "channelId": 1135982,
+      "writeKey": "3ACLO7AQWY0ZJMOX",
+      "readKey": "XED0552B491ZSGXY"
+    }
+  };
+
+  MqttServerClient client =
+      MqttServerClient.withPort(MQTT_SERVER, MQTT_CLIENT_ID, 1883);
 
   var carritoEncendido = false;
 
@@ -113,6 +139,29 @@ class _MyDashboardState extends State<MyHomePage> {
     noti.initialize(settings, onSelectNotification: this.onSelectNotification);
   }
 
+  void onMqttConnected() {
+    print("mqtt connected");
+
+    setState(() {
+      isMqttConnected = true;
+    });
+  }
+
+  void onMqttDisconnected() {
+    print("mqtt disconnected");
+    setState(() {
+      isMqttConnected = false;
+    });
+  }
+
+  void onMqttSubscribed(to) {
+    print(to);
+  }
+
+  void onMqttSubscribeFailed(to) {
+    print(to);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -124,60 +173,127 @@ class _MyDashboardState extends State<MyHomePage> {
           children: [
             Row(
               children: [
-                FlatButton(
-                    child: Text("Conectar"),
-                    color: Colors.blue,
-                    textColor: Colors.white,
-                    onPressed: this.isConnected
-                        ? null
-                        : () async {
-                            var c = MqttServerClient.withPort(
-                                '104.131.116.187', 'cesar', 1883);
-                            // c.logging(on: true);
-                            c.onConnected = () {
-                              print("connected...");
-                              if (client != null) {
-                                client.disconnect();
-                              }
+                Switch(
+                    value: this.isMqttConnected,
+                    onChanged: (to) async {
+                      try {
+                        if (to) {
+                          // client.logging(on: true);
 
-                              setState(() {
-                                client = c;
-                              });
-                            };
+                          client.onConnected = this.onMqttConnected;
+                          client.onDisconnected = this.onMqttDisconnected;
+                          client.onSubscribed = this.onMqttSubscribed;
+                          client.onSubscribeFail = this.onMqttSubscribeFailed;
+                          final connMesage = MqttConnectMessage()
+                              .authenticateAs(MQTT_USER, MQTT_KEY)
+                              .withClientIdentifier(MQTT_CLIENT_ID)
+                              .startClean();
 
-                            c.onDisconnected = () {
-                              print("disconnected...");
-                              if (client != null) {
-                                client.disconnect();
-                              }
-                              setState(() {
-                                client = null;
-                              });
-                            };
+                          client.connectionMessage = connMesage;
 
-                            try {
-                              print("connecting...");
-                              await c.connect();
-                              c.subscribe("test", MqttQos.atLeastOnce);
-                              c.updates.listen(
-                                  (List<MqttReceivedMessage<MqttMessage>> c) {
-                                final MqttPublishMessage message = c[0].payload;
-                                final payload =
-                                    MqttPublishPayload.bytesToStringAsString(
-                                        message.payload.message);
+                          print("mqtt connecting...");
+                          await client.connect();
+                          // print(status);
 
-                                this.showNotification("title", payload);
+                          client.updates.listen(
+                              (List<MqttReceivedMessage<MqttMessage>> c) {
+                            final MqttPublishMessage message = c[0].payload;
+                            final payload =
+                                MqttPublishPayload.bytesToStringAsString(
+                                    message.payload.message);
 
-                                setState(() {
-                                  testTopic.add(payload);
-                                });
-                              });
-                            } catch (ex) {
-                              print(ex.toString());
-                              c.disconnect();
-                            }
-                          }),
-                Text(this.connectionState.toString())
+                            // this.showNotification("title", payload);
+
+                            setState(() {
+                              testTopic.add(payload);
+                            });
+                          });
+                        } else {
+                          client.disconnect();
+                        }
+                      } catch (e) {
+                        print(e.toString());
+                      }
+                    })
+                // FlatButton(
+                //     child: Text("Conectar"),
+                //     color: Colors.blue,
+                //     textColor: Colors.white,
+                //     onPressed: this.isConnected
+                //         ? null
+                //         : () async {
+                //             var c =
+                //                 MqttServerClient(MQTT_SERVER, MQTT_CLIENT_ID);
+                //             // c.logging(on: true);
+
+                //             c.onConnected = () {
+                //               print("connected...");
+                //               if (client != null) {
+                //                 client.disconnect();
+                //               }
+
+                //               setState(() {
+                //                 client = c;
+                //               });
+                //             };
+                //             c.onSubscribed = (payload) {
+                //               print(payload);
+                //             };
+                //             c.onSubscribeFail = (payload) {
+                //               print(payload);
+                //             };
+
+                //             c.onDisconnected = () {
+                //               print("disconnected...");
+                //               if (client != null) {
+                //                 client.disconnect();
+                //               }
+                //               setState(() {
+                //                 client = null;
+                //               });
+                //             };
+
+                //             final connMesage = MqttConnectMessage()
+                //                 .authenticateAs(MQTT_USER, MQTT_KEY)
+                //                 .withClientIdentifier(MQTT_CLIENT_ID)
+                //                 .startClean();
+
+                //             c.connectionMessage = connMesage;
+
+                //             try {
+                //               print("connecting...");
+                //               await c.connect();
+
+                //               // final channelId =
+                //               //     MQTT_CANALES['DatosArduino']['channelId'];
+                //               // final readKey =
+                //               //     MQTT_CANALES['DatosArduino']['readKey'];
+                //               // final topic =
+                //               //     "channels/$channelId/subscribe/fields/field1/$readKey";
+
+                //               // // print(topic);
+                //               // c.subscribe(
+                //               //     "channels/1117472/subscribe/fields/field1/IREIF7337EH8HWYL",
+                //               //     MqttQos.atLeastOnce);
+                //               // c.updates.listen(
+                //               //     (List<MqttReceivedMessage<MqttMessage>> c) {
+                //               //   final MqttPublishMessage message = c[0].payload;
+                //               //   final payload =
+                //               //       MqttPublishPayload.bytesToStringAsString(
+                //               //           message.payload.message);
+
+                //               //   // this.showNotification("title", payload);
+
+                //               //   setState(() {
+                //               //     testTopic.add(payload);
+                //               //   });
+                //               // });
+                //             } catch (ex) {
+                //               print(ex.toString());
+                //               c.disconnect();
+                //             }
+                //           }),
+                // Text(this.connectionState.toString())
               ],
             ),
             Row(
@@ -185,15 +301,28 @@ class _MyDashboardState extends State<MyHomePage> {
                 Switch(
                     value: this.carritoEncendido,
                     onChanged: (val) {
+                      // final sub = this.client.subscribe(
+                      //     "channels/1117472/subscribe/fields/field1",
+                      //     MqttQos.atMostOnce);
+
+                      // print(sub == null ? "null" : sub.topic.rawTopic);
+
                       setState(() {
                         this.carritoEncendido = val;
                       });
 
-                      final pubTopic = "arqui2/proyecto1/carrito";
+                      final channelId =
+                          MQTT_CANALES['DatosArduino']['channelId'];
+                      final writeKey = MQTT_CANALES['DatosArduino']['writeKey'];
+                      final topic =
+                          "channels/$channelId/publish/fields/field1/$writeKey";
+
                       final builder = MqttClientPayloadBuilder();
                       builder.addString(val ? 'on' : "off");
                       client.publishMessage(
-                          pubTopic, MqttQos.atLeastOnce, builder.payload);
+                          "channels/1117472/publish/fields/field1/8NCUJ7OGZ0KS1Q5F",
+                          MqttQos.atMostOnce,
+                          builder.payload);
                     }),
                 Text(this.carritoEncendido ? "Encendido" : "Apagado")
               ],
