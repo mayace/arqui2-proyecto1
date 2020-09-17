@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:mqtt_client/mqtt_client.dart';
@@ -57,9 +59,11 @@ class _MyDashboardState extends State<MyHomePage> {
 
   var isMqttConnected = false;
 
+  static const CARRO_TOPIC =
+      "channels/1117472/publish/fields/field1/8NCUJ7OGZ0KS1Q5F";
   static const ARDUINO_TOPIC = "channels/1117472/subscribe/json";
-  static const PROMEDIOS_TOPIC = "channels/1135979/subscribe/fields/+";
-  static const PETICIONES_TOPIC = "channels/1135982/subscribe/fields/+";
+  static const PROMEDIOS_TOPIC = "channels/1135979/subscribe/json";
+  static const PETICIONES_TOPIC = "channels/1135982/subscribe/json";
 
   final amISubscribedTo = {"channels/1117472/subscribe/fields/field1": false};
 
@@ -228,8 +232,10 @@ class _MyDashboardState extends State<MyHomePage> {
                             final topicName =
                                 this.mqttChannels[c[0].topic]["nombre"];
 
+                            final dd = json.decode(payload);
+
                             setState(() {
-                              testTopic.add("$topicName: $payload");
+                              testTopic.add("$topicName: $dd");
                             });
                           });
                         } else {
@@ -239,85 +245,18 @@ class _MyDashboardState extends State<MyHomePage> {
                         print(e.toString());
                       }
                     }),
-                Text("Mqtt")
-                // FlatButton(
-                //     child: Text("Conectar"),
-                //     color: Colors.blue,
-                //     textColor: Colors.white,
-                //     onPressed: this.isConnected
-                //         ? null
-                //         : () async {
-                //             var c =
-                //                 MqttServerClient(MQTT_SERVER, MQTT_CLIENT_ID);
-                //             // c.logging(on: true);
+                Text("Mqtt"),
+                Switch(
+                  value: false,
+                  onChanged: (val) {
+                    final builder = MqttClientPayloadBuilder();
+                    builder.addString(val ? "encender" : "apagar");
 
-                //             c.onConnected = () {
-                //               print("connected...");
-                //               if (client != null) {
-                //                 client.disconnect();
-                //               }
-
-                //               setState(() {
-                //                 client = c;
-                //               });
-                //             };
-                //             c.onSubscribed = (payload) {
-                //               print(payload);
-                //             };
-                //             c.onSubscribeFail = (payload) {
-                //               print(payload);
-                //             };
-
-                //             c.onDisconnected = () {
-                //               print("disconnected...");
-                //               if (client != null) {
-                //                 client.disconnect();
-                //               }
-                //               setState(() {
-                //                 client = null;
-                //               });
-                //             };
-
-                //             final connMesage = MqttConnectMessage()
-                //                 .authenticateAs(MQTT_USER, MQTT_KEY)
-                //                 .withClientIdentifier(MQTT_CLIENT_ID)
-                //                 .startClean();
-
-                //             c.connectionMessage = connMesage;
-
-                //             try {
-                //               print("connecting...");
-                //               await c.connect();
-
-                //               // final channelId =
-                //               //     MQTT_CANALES['DatosArduino']['channelId'];
-                //               // final readKey =
-                //               //     MQTT_CANALES['DatosArduino']['readKey'];
-                //               // final topic =
-                //               //     "channels/$channelId/subscribe/fields/field1/$readKey";
-
-                //               // // print(topic);
-                //               // c.subscribe(
-                //               //     "channels/1117472/subscribe/fields/field1/IREIF7337EH8HWYL",
-                //               //     MqttQos.atLeastOnce);
-                //               // c.updates.listen(
-                //               //     (List<MqttReceivedMessage<MqttMessage>> c) {
-                //               //   final MqttPublishMessage message = c[0].payload;
-                //               //   final payload =
-                //               //       MqttPublishPayload.bytesToStringAsString(
-                //               //           message.payload.message);
-
-                //               //   // this.showNotification("title", payload);
-
-                //               //   setState(() {
-                //               //     testTopic.add(payload);
-                //               //   });
-                //               // });
-                //             } catch (ex) {
-                //               print(ex.toString());
-                //               c.disconnect();
-                //             }
-                //           }),
+                    this.client.publishMessage(
+                        CARRO_TOPIC, MqttQos.atMostOnce, builder.payload);
+                  },
+                ),
+                Text("Carro")
               ],
             ),
             Row(
