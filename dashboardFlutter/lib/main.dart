@@ -57,6 +57,18 @@ class _MyDashboardState extends State<MyHomePage> {
 
   var isMqttConnected = false;
 
+  static const ARDUINO_TOPIC = "channels/1117472/subscribe/json";
+  static const PROMEDIOS_TOPIC = "channels/1135979/subscribe/fields/+";
+  static const PETICIONES_TOPIC = "channels/1135982/subscribe/fields/+";
+
+  final amISubscribedTo = {"channels/1117472/subscribe/fields/field1": false};
+
+  final mqttChannels = {
+    ARDUINO_TOPIC: {"conectado": false, "nombre": "arduino"},
+    PROMEDIOS_TOPIC: {"conectado": false, "nombre": "promedios"},
+    PETICIONES_TOPIC: {"conectado": false, "nombre": "peticiones"},
+  };
+
   static const MQTT_SERVER = "mqtt.thingspeak.com";
   static const MQTT_CLIENT_ID = "movil_client";
   static const MQTT_USER = "movil_user";
@@ -66,17 +78,17 @@ class _MyDashboardState extends State<MyHomePage> {
     "DatosArduino": {
       "channelId": 1117472,
       "writeKey": "8NCUJ7OGZ0KS1Q5F",
-      "readKey": "IREIF7337EH8HWYL"
+      "readKey": "IREIF7337EH8HWYL",
     },
     "Promedios": {
       "channelId": 1135979,
       "writeKey": "AQ0XIG183CO29RDF",
-      "readKey": "AG9TYKD91EIYP061"
+      "readKey": "AG9TYKD91EIYP061",
     },
     "Peticiones": {
       "channelId": 1135982,
       "writeKey": "3ACLO7AQWY0ZJMOX",
-      "readKey": "XED0552B491ZSGXY"
+      "readKey": "XED0552B491ZSGXY",
     }
   };
 
@@ -155,7 +167,15 @@ class _MyDashboardState extends State<MyHomePage> {
   }
 
   void onMqttSubscribed(to) {
-    print(to);
+    setState(() {
+      this.mqttChannels[to]["conectado"] = true;
+    });
+  }
+
+  void onMqttUnsubscribed(to) {
+    setState(() {
+      this.mqttChannels[to]["conectado"] = false;
+    });
   }
 
   void onMqttSubscribeFailed(to) {
@@ -184,6 +204,7 @@ class _MyDashboardState extends State<MyHomePage> {
                           client.onDisconnected = this.onMqttDisconnected;
                           client.onSubscribed = this.onMqttSubscribed;
                           client.onSubscribeFail = this.onMqttSubscribeFailed;
+                          client.onUnsubscribed = this.onMqttUnsubscribed;
                           final connMesage = MqttConnectMessage()
                               .authenticateAs(MQTT_USER, MQTT_KEY)
                               .withClientIdentifier(MQTT_CLIENT_ID)
@@ -204,8 +225,11 @@ class _MyDashboardState extends State<MyHomePage> {
 
                             // this.showNotification("title", payload);
 
+                            final topicName =
+                                this.mqttChannels[c[0].topic]["nombre"];
+
                             setState(() {
-                              testTopic.add(payload);
+                              testTopic.add("$topicName: $payload");
                             });
                           });
                         } else {
@@ -214,7 +238,8 @@ class _MyDashboardState extends State<MyHomePage> {
                       } catch (e) {
                         print(e.toString());
                       }
-                    })
+                    }),
+                Text("Mqtt")
                 // FlatButton(
                 //     child: Text("Conectar"),
                 //     color: Colors.blue,
@@ -293,38 +318,46 @@ class _MyDashboardState extends State<MyHomePage> {
                 //               c.disconnect();
                 //             }
                 //           }),
-                // Text(this.connectionState.toString())
               ],
             ),
             Row(
               children: [
                 Switch(
-                    value: this.carritoEncendido,
+                    value: this.mqttChannels[ARDUINO_TOPIC]["conectado"],
                     onChanged: (val) {
-                      // final sub = this.client.subscribe(
-                      //     "channels/1117472/subscribe/fields/field1",
-                      //     MqttQos.atMostOnce);
-
-                      // print(sub == null ? "null" : sub.topic.rawTopic);
-
-                      setState(() {
-                        this.carritoEncendido = val;
-                      });
-
-                      final channelId =
-                          MQTT_CANALES['DatosArduino']['channelId'];
-                      final writeKey = MQTT_CANALES['DatosArduino']['writeKey'];
-                      final topic =
-                          "channels/$channelId/publish/fields/field1/$writeKey";
-
-                      final builder = MqttClientPayloadBuilder();
-                      builder.addString(val ? 'on' : "off");
-                      client.publishMessage(
-                          "channels/1117472/publish/fields/field1/8NCUJ7OGZ0KS1Q5F",
-                          MqttQos.atMostOnce,
-                          builder.payload);
+                      if (val) {
+                        this
+                            .client
+                            .subscribe(ARDUINO_TOPIC, MqttQos.atMostOnce);
+                      } else {
+                        this.client.unsubscribe(ARDUINO_TOPIC);
+                      }
                     }),
-                Text(this.carritoEncendido ? "Encendido" : "Apagado")
+                Text("ARD"),
+                Switch(
+                    value: this.mqttChannels[PROMEDIOS_TOPIC]["conectado"],
+                    onChanged: (val) {
+                      if (val) {
+                        this
+                            .client
+                            .subscribe(PROMEDIOS_TOPIC, MqttQos.atMostOnce);
+                      } else {
+                        this.client.unsubscribe(PROMEDIOS_TOPIC);
+                      }
+                    }),
+                Text("PRO"),
+                Switch(
+                    value: this.mqttChannels[PETICIONES_TOPIC]["conectado"],
+                    onChanged: (val) {
+                      if (val) {
+                        this
+                            .client
+                            .subscribe(PETICIONES_TOPIC, MqttQos.atMostOnce);
+                      } else {
+                        this.client.unsubscribe(PETICIONES_TOPIC);
+                      }
+                    }),
+                Text("PET")
               ],
             ),
             Expanded(
