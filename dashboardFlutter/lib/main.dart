@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
+import 'package:intl/intl.dart';
 
 void main() {
   runApp(MyApp());
@@ -59,6 +60,8 @@ class _MyDashboardState extends State<MyHomePage> {
 
   var isMqttConnected = false;
 
+  static const DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
+
   static const CARRO_TOPIC =
       "channels/1117472/publish/fields/field1/8NCUJ7OGZ0KS1Q5F";
   static const ARDUINO_TOPIC = "channels/1117472/subscribe/json";
@@ -77,7 +80,19 @@ class _MyDashboardState extends State<MyHomePage> {
   final amISubscribedTo = {"channels/1117472/subscribe/fields/field1": false};
 
   final mqttChannels = {
-    ARDUINO_TOPIC: {"conectado": false, "nombre": "arduino"},
+    ARDUINO_TOPIC: {
+      "conectado": false,
+      "nombre": "ARDUINO",
+      "campos": [
+        {"nombre": "Created at", "key": "created_at", "valor": null},
+        {"nombre": "Ubicación", "key": "field1", "valor": null},
+        {"nombre": "Estado", "key": "field2", "valor": null},
+        {"nombre": "Paquetes entregados", "key": "field3", "valor": 0},
+        {"nombre": "Obstaculos", "key": "field4", "valor": 0},
+        {"nombre": "Peso", "key": "field5", "valor": 0}
+      ],
+      "valor": null
+    },
     PROMEDIOS_TOPIC: {"conectado": false, "nombre": "promedios"},
     PETICIONES_TOPIC: {"conectado": false, "nombre": "peticiones"},
     CARRO_UBICACION_TOPIC: {
@@ -240,6 +255,20 @@ class _MyDashboardState extends State<MyHomePage> {
     final topic = c[0].topic;
     final localTopic = this.mqttChannels[topic];
 
+    switch (topic) {
+      case ARDUINO_TOPIC:
+        final dy = json.decode(payload);
+        final campos = localTopic["campos"] as List;
+        for (Map item in campos) {
+          setState(() {
+            item["valor"] = dy[item["key"]];
+          });
+        }
+        break;
+      default:
+        print("${localTopic["nombre"]}: $payload");
+    }
+
     setState(() {
       localTopic["valor"] = payload;
     });
@@ -252,6 +281,22 @@ class _MyDashboardState extends State<MyHomePage> {
     // testTopic.add("$topicName: $payload");
     // this.mqttChannels[localTopic]["valor"] = payload;
     // });
+  }
+
+  String formatCreatedAt(dynamic json) {
+    final createdAt = json["created_at"];
+    if (createdAt == null) {
+      return null;
+    }
+    return formatearFecha(DateTime.parse(createdAt), "yyy-MM-dd hh:mm:ss");
+  }
+
+  String formatearFecha(DateTime fecha, String format) {
+    if (fecha == null) {
+      return null;
+    }
+
+    return DateFormat(format).format(fecha);
   }
 
   @override
@@ -314,211 +359,54 @@ class _MyDashboardState extends State<MyHomePage> {
               children: [
                 Switch(
                     value: this.mqttChannels[ARDUINO_TOPIC]["conectado"],
-                    onChanged: (val) {
-                      if (val) {
-                        this
-                            .client
-                            .subscribe(ARDUINO_TOPIC, MqttQos.atMostOnce);
-                      } else {
-                        this.client.unsubscribe(ARDUINO_TOPIC);
+                    onChanged: this.mqttTopicSubscription(ARDUINO_TOPIC)),
+                Text("ARDUINO "),
+                // Switch(
+                //     value: this.mqttChannels[PROMEDIOS_TOPIC]["conectado"],
+                //     onChanged: (val) {
+                //       if (val) {
+                //         this
+                //             .client
+                //             .subscribe(PROMEDIOS_TOPIC, MqttQos.atMostOnce);
+                //       } else {
+                //         this.client.unsubscribe(PROMEDIOS_TOPIC);
+                //       }
+                //     }),
+                // Text("PRO"),
+                // Switch(
+                //     value: this.mqttChannels[PETICIONES_TOPIC]["conectado"],
+                //     onChanged: (val) {
+                //       if (val) {
+                //         this
+                //             .client
+                //             .subscribe(PETICIONES_TOPIC, MqttQos.atMostOnce);
+                //       } else {
+                //         this.client.unsubscribe(PETICIONES_TOPIC);
+                //       }
+                //     }),
+                // Text("PET")
+              ],
+            ),
+            Expanded(
+                child: ListView.builder(
+                    itemCount:
+                        (this.mqttChannels[ARDUINO_TOPIC]["campos"] as List)
+                            .length,
+                    itemBuilder: (context, index) {
+                      final canal = mqttChannels[ARDUINO_TOPIC];
+                      final List campos = canal["campos"];
+                      final item = campos[index];
+                      final key = item["key"];
+                      var valor = item["valor"];
+                      if (valor != null && key == "created_at") {
+                        valor =
+                            formatearFecha(DateTime.parse(valor), DATE_FORMAT);
                       }
-                    }),
-                Text("ARD"),
-                Switch(
-                    value: this.mqttChannels[PROMEDIOS_TOPIC]["conectado"],
-                    onChanged: (val) {
-                      if (val) {
-                        this
-                            .client
-                            .subscribe(PROMEDIOS_TOPIC, MqttQos.atMostOnce);
-                      } else {
-                        this.client.unsubscribe(PROMEDIOS_TOPIC);
-                      }
-                    }),
-                Text("PRO"),
-                Switch(
-                    value: this.mqttChannels[PETICIONES_TOPIC]["conectado"],
-                    onChanged: (val) {
-                      if (val) {
-                        this
-                            .client
-                            .subscribe(PETICIONES_TOPIC, MqttQos.atMostOnce);
-                      } else {
-                        this.client.unsubscribe(PETICIONES_TOPIC);
-                      }
-                    }),
-                Text("PET")
-              ],
-            ),
-            Row(
-              children: [
-                Switch(
-                    value: this.mqttChannels[CARRO_UBICACION_TOPIC]
-                        ["conectado"],
-                    onChanged: mqttTopicSubscription(CARRO_UBICACION_TOPIC)),
-                Text("${mqttChannels[CARRO_UBICACION_TOPIC]["nombre"]}: "
-                    .toUpperCase()),
-                Text(mqttChannels[CARRO_UBICACION_TOPIC]["valor"])
-              ],
-            ),
-            Row(
-              children: [
-                Switch(
-                    value: this.mqttChannels[CARRO_ESTADO_TOPIC]["conectado"],
-                    onChanged: mqttTopicSubscription(CARRO_ESTADO_TOPIC)),
-                Text("${mqttChannels[CARRO_ESTADO_TOPIC]["nombre"]}: "
-                    .toUpperCase()),
-                Text(mqttChannels[CARRO_ESTADO_TOPIC]["valor"])
-              ],
-            ),
-            Row(
-              children: [
-                Switch(
-                    value: this.mqttChannels[CARRO_PAQUETES_TOPIC]["conectado"],
-                    onChanged: mqttTopicSubscription(CARRO_PAQUETES_TOPIC)),
-                Text("${mqttChannels[CARRO_PAQUETES_TOPIC]["nombre"]}: "
-                    .toUpperCase()),
-                Text(mqttChannels[CARRO_PAQUETES_TOPIC]["valor"])
-              ],
-            ),
-            Row(
-              children: [
-                Switch(
-                    value: this.mqttChannels[CARRO_OBSTACULOS_TOPIC]
-                        ["conectado"],
-                    onChanged: mqttTopicSubscription(CARRO_OBSTACULOS_TOPIC)),
-                Text("${mqttChannels[CARRO_OBSTACULOS_TOPIC]["nombre"]}: "
-                    .toUpperCase()),
-                Text(mqttChannels[CARRO_OBSTACULOS_TOPIC]["valor"])
-              ],
-            ),
-            Row(
-              children: [
-                Switch(
-                    value: this.mqttChannels[CARRO_PESO_TOPIC]["conectado"],
-                    onChanged: mqttTopicSubscription(CARRO_PESO_TOPIC)),
-                Text("${mqttChannels[CARRO_PESO_TOPIC]["nombre"]}: "
-                    .toUpperCase()),
-                Text(mqttChannels[CARRO_PESO_TOPIC]["valor"])
-              ],
-            )
-            // Expanded(
-            //     child: ListView.builder(
-            //         itemCount: testTopic.length,
-            //         itemBuilder: (context, index) {
-            //           return Text(testTopic[index]);
-            //         }))
+                      return Text("${item["nombre"]}: $valor");
+                    }))
           ],
         ),
       ),
-    );
-  }
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  var testTopic = [];
-
-  void onConnected() {
-    print("connected");
-  }
-
-  void onDisconnected() {
-    print("disconnected");
-  }
-
-  void _incrementCounter() async {
-    MqttServerClient client =
-        MqttServerClient.withPort('104.131.116.187', 'cesar', 1883);
-    // client.logging(on: true);
-    // client.onDisconnected = onDisconnected;
-    // client.onConnected = onConnected;
-
-    // final connMessage = MqttConnectMessage()
-    //     .authenticateAs('', '')
-    //     .keepAliveFor(60)
-    //     .withWillTopic('')
-    //     .withWillMessage('')
-    //     .startClean()
-    //     .withWillQos(MqttQos.atLeastOnce);
-    // client.connectionMessage = connMessage;
-
-    try {
-      await client.connect();
-      client.subscribe("test", MqttQos.atLeastOnce);
-      client.updates.listen((List<MqttReceivedMessage<MqttMessage>> c) {
-        final MqttPublishMessage message = c[0].payload;
-        final payload =
-            MqttPublishPayload.bytesToStringAsString(message.payload.message);
-
-        testTopic.add(payload);
-        // print('Received message:$payload from topic: ${c[0].topic}>');
-      });
-    } catch (e) {
-      print(e.toString());
-      client.disconnect();
-    }
-
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
