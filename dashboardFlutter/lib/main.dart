@@ -63,7 +63,7 @@ class _MyDashboardState extends State<MyHomePage> {
   static const DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
   static const CARRO_TOPIC =
-      "channels/1117472/publish/fields/field1/8NCUJ7OGZ0KS1Q5F";
+      "channels/1135982/publish/fields/field1/3ACLO7AQWY0ZJMOX";
   static const ARDUINO_TOPIC = "channels/1117472/subscribe/json";
   static const PROMEDIOS_TOPIC = "channels/1135979/subscribe/json";
   static const PETICIONES_TOPIC = "channels/1135982/subscribe/json";
@@ -89,7 +89,9 @@ class _MyDashboardState extends State<MyHomePage> {
         {"nombre": "Estado", "key": "field2", "valor": null},
         {"nombre": "Paquetes entregados", "key": "field3", "valor": 0},
         {"nombre": "Obstaculos", "key": "field4", "valor": 0},
-        {"nombre": "Peso", "key": "field5", "valor": 0}
+        {"nombre": "Peso", "key": "field5", "valor": 0},
+        {"nombre": "Tiempo de entrega", "key": "field6", "valor": null},
+        {"nombre": "Tiempo de retorno", "key": "field7", "valor": null},
       ],
       "valor": null
     },
@@ -174,7 +176,7 @@ class _MyDashboardState extends State<MyHomePage> {
       title,
       body,
       platformChannelSpecifics,
-      payload: 'Default_Sound',
+      payload: "[$title] $body",
     );
   }
 
@@ -182,7 +184,7 @@ class _MyDashboardState extends State<MyHomePage> {
     return showDialog(
         context: this.context,
         builder: (context) => new AlertDialog(
-              title: Text("dd"),
+              title: Text("Detalle"),
               content: Text(payload),
             ));
     // Navigator.of(context).push(MaterialPageRoute(builder: (_) {
@@ -259,11 +261,69 @@ class _MyDashboardState extends State<MyHomePage> {
       case ARDUINO_TOPIC:
         final dy = json.decode(payload);
         final campos = localTopic["campos"] as List;
+        var notificarLlegada = false;
+        var notificarRetorno = false;
+
         for (Map item in campos) {
+          final key = item["key"];
+          var valorNuevo = dy[key];
+          var valorActual = item["valor"];
+
+          switch (key) {
+
+            // paquetes entregados;
+            case "field3":
+              if (valorNuevo == null) {
+                valorNuevo = 0;
+              }
+              valorNuevo = int.parse(valorActual.toString()) +
+                  int.parse(valorNuevo.toString());
+              if (int.parse(valorNuevo.toString()) > 0) {
+                notificarLlegada = true;
+              }
+              break;
+            // obstaculos;
+            case "field4":
+              if (valorNuevo == null) {
+                valorNuevo = 0;
+              }
+              valorNuevo = int.parse(valorActual.toString()) +
+                  int.parse(valorNuevo.toString());
+
+              break;
+            // peso
+            case "field5":
+              if (valorNuevo != null) {
+                this.showNotification("Nuevo paquete",
+                    "Con peso $valorNuevo a las ${formatearFecha(DateTime.now(), DATE_FORMAT)}.");
+              }
+              break;
+            // tiempo en retornar
+            case "field7":
+              if (valorNuevo != null) {
+                notificarRetorno = true;
+              }
+              break;
+            default:
+              if (valorNuevo == null) {
+                valorNuevo = valorActual;
+              }
+          }
+
           setState(() {
-            item["valor"] = dy[item["key"]];
+            item["valor"] = valorNuevo;
           });
         }
+
+        if (notificarLlegada) {
+          this.showNotification("Paquete entregado",
+              "Con peso 1, 2 obstaculos encontrados a las ${formatearFecha(DateTime.now(), DATE_FORMAT)} ");
+        }
+        if (notificarRetorno) {
+          this.showNotification("Esperando paquete",
+              "El carro retorno al punto de inicio a las ${formatearFecha(DateTime.now(), DATE_FORMAT)}, 10 obstaculos encontrados,");
+        }
+
         break;
       default:
         print("${localTopic["nombre"]}: $payload");
@@ -346,8 +406,9 @@ class _MyDashboardState extends State<MyHomePage> {
                   value: false,
                   onChanged: (val) {
                     final builder = MqttClientPayloadBuilder();
-                    builder.addString(val ? "encender" : "apagar");
+                    builder.addString(val ? "1" : "0");
 
+                    print(CARRO_TOPIC);
                     this.client.publishMessage(
                         CARRO_TOPIC, MqttQos.atMostOnce, builder.payload);
                   },
@@ -355,38 +416,12 @@ class _MyDashboardState extends State<MyHomePage> {
                 Text("Carro")
               ],
             ),
-            Row(
-              children: [
-                Switch(
-                    value: this.mqttChannels[ARDUINO_TOPIC]["conectado"],
-                    onChanged: this.mqttTopicSubscription(ARDUINO_TOPIC)),
-                Text("ARDUINO "),
-                // Switch(
-                //     value: this.mqttChannels[PROMEDIOS_TOPIC]["conectado"],
-                //     onChanged: (val) {
-                //       if (val) {
-                //         this
-                //             .client
-                //             .subscribe(PROMEDIOS_TOPIC, MqttQos.atMostOnce);
-                //       } else {
-                //         this.client.unsubscribe(PROMEDIOS_TOPIC);
-                //       }
-                //     }),
-                // Text("PRO"),
-                // Switch(
-                //     value: this.mqttChannels[PETICIONES_TOPIC]["conectado"],
-                //     onChanged: (val) {
-                //       if (val) {
-                //         this
-                //             .client
-                //             .subscribe(PETICIONES_TOPIC, MqttQos.atMostOnce);
-                //       } else {
-                //         this.client.unsubscribe(PETICIONES_TOPIC);
-                //       }
-                //     }),
-                // Text("PET")
-              ],
-            ),
+            Row(children: [
+              Switch(
+                  value: this.mqttChannels[ARDUINO_TOPIC]["conectado"],
+                  onChanged: this.mqttTopicSubscription(ARDUINO_TOPIC)),
+              Text("ARDUINO "),
+            ]),
             Expanded(
                 child: ListView.builder(
                     itemCount:
