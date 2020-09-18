@@ -65,12 +65,46 @@ class _MyDashboardState extends State<MyHomePage> {
   static const PROMEDIOS_TOPIC = "channels/1135979/subscribe/json";
   static const PETICIONES_TOPIC = "channels/1135982/subscribe/json";
 
+  static const CARRO_UBICACION_TOPIC =
+      "channels/1117472/subscribe/fields/field1";
+  static const CARRO_ESTADO_TOPIC = "channels/1117472/subscribe/fields/field2";
+  static const CARRO_PAQUETES_TOPIC =
+      "channels/1117472/subscribe/fields/field3";
+  static const CARRO_OBSTACULOS_TOPIC =
+      "channels/1117472/subscribe/fields/field4";
+  static const CARRO_PESO_TOPIC = "channels/1117472/subscribe/fields/field5";
+
   final amISubscribedTo = {"channels/1117472/subscribe/fields/field1": false};
 
   final mqttChannels = {
     ARDUINO_TOPIC: {"conectado": false, "nombre": "arduino"},
     PROMEDIOS_TOPIC: {"conectado": false, "nombre": "promedios"},
     PETICIONES_TOPIC: {"conectado": false, "nombre": "peticiones"},
+    CARRO_UBICACION_TOPIC: {
+      "conectado": false,
+      "nombre": "Ubicación",
+      "valor": "No data.",
+    },
+    CARRO_ESTADO_TOPIC: {
+      "conectado": false,
+      "nombre": "Estado",
+      "valor": "No data.",
+    },
+    CARRO_PAQUETES_TOPIC: {
+      "conectado": false,
+      "nombre": "Paquetes entregados",
+      "valor": "No data.",
+    },
+    CARRO_OBSTACULOS_TOPIC: {
+      "conectado": false,
+      "nombre": "Obstáculos",
+      "valor": "No data.",
+    },
+    CARRO_PESO_TOPIC: {
+      "conectado": false,
+      "nombre": "Peso paquete",
+      "valor": "No data.",
+    }
   };
 
   static const MQTT_SERVER = "mqtt.thingspeak.com";
@@ -186,6 +220,40 @@ class _MyDashboardState extends State<MyHomePage> {
     print(to);
   }
 
+  Function(bool) mqttTopicSubscription(String topic) {
+    return (val) {
+      if (val) {
+        this.client.subscribe(topic, MqttQos.atMostOnce);
+      } else {
+        this.client.unsubscribe(topic);
+      }
+    };
+  }
+
+  void onMqttMessageReceived(List<MqttReceivedMessage<MqttMessage>> c) {
+    final MqttPublishMessage message = c[0].payload;
+    final payload =
+        MqttPublishPayload.bytesToStringAsString(message.payload.message);
+
+    // this.showNotification("title", payload);
+
+    final topic = c[0].topic;
+    final localTopic = this.mqttChannels[topic];
+
+    setState(() {
+      localTopic["valor"] = payload;
+    });
+
+    // final dd = json.decode(payload);
+    // (localTopic["procesar"] as void Function(
+    //     String))(payload);
+
+    // setState(() {
+    // testTopic.add("$topicName: $payload");
+    // this.mqttChannels[localTopic]["valor"] = payload;
+    // });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -220,24 +288,7 @@ class _MyDashboardState extends State<MyHomePage> {
                           await client.connect();
                           // print(status);
 
-                          client.updates.listen(
-                              (List<MqttReceivedMessage<MqttMessage>> c) {
-                            final MqttPublishMessage message = c[0].payload;
-                            final payload =
-                                MqttPublishPayload.bytesToStringAsString(
-                                    message.payload.message);
-
-                            // this.showNotification("title", payload);
-
-                            final topicName =
-                                this.mqttChannels[c[0].topic]["nombre"];
-
-                            final dd = json.decode(payload);
-
-                            setState(() {
-                              testTopic.add("$topicName: $dd");
-                            });
-                          });
+                          client.updates.listen(onMqttMessageReceived);
                         } else {
                           client.disconnect();
                         }
@@ -299,12 +350,64 @@ class _MyDashboardState extends State<MyHomePage> {
                 Text("PET")
               ],
             ),
-            Expanded(
-                child: ListView.builder(
-                    itemCount: testTopic.length,
-                    itemBuilder: (context, index) {
-                      return Text(testTopic[index]);
-                    }))
+            Row(
+              children: [
+                Switch(
+                    value: this.mqttChannels[CARRO_UBICACION_TOPIC]
+                        ["conectado"],
+                    onChanged: mqttTopicSubscription(CARRO_UBICACION_TOPIC)),
+                Text("${mqttChannels[CARRO_UBICACION_TOPIC]["nombre"]}: "
+                    .toUpperCase()),
+                Text(mqttChannels[CARRO_UBICACION_TOPIC]["valor"])
+              ],
+            ),
+            Row(
+              children: [
+                Switch(
+                    value: this.mqttChannels[CARRO_ESTADO_TOPIC]["conectado"],
+                    onChanged: mqttTopicSubscription(CARRO_ESTADO_TOPIC)),
+                Text("${mqttChannels[CARRO_ESTADO_TOPIC]["nombre"]}: "
+                    .toUpperCase()),
+                Text(mqttChannels[CARRO_ESTADO_TOPIC]["valor"])
+              ],
+            ),
+            Row(
+              children: [
+                Switch(
+                    value: this.mqttChannels[CARRO_PAQUETES_TOPIC]["conectado"],
+                    onChanged: mqttTopicSubscription(CARRO_PAQUETES_TOPIC)),
+                Text("${mqttChannels[CARRO_PAQUETES_TOPIC]["nombre"]}: "
+                    .toUpperCase()),
+                Text(mqttChannels[CARRO_PAQUETES_TOPIC]["valor"])
+              ],
+            ),
+            Row(
+              children: [
+                Switch(
+                    value: this.mqttChannels[CARRO_OBSTACULOS_TOPIC]
+                        ["conectado"],
+                    onChanged: mqttTopicSubscription(CARRO_OBSTACULOS_TOPIC)),
+                Text("${mqttChannels[CARRO_OBSTACULOS_TOPIC]["nombre"]}: "
+                    .toUpperCase()),
+                Text(mqttChannels[CARRO_OBSTACULOS_TOPIC]["valor"])
+              ],
+            ),
+            Row(
+              children: [
+                Switch(
+                    value: this.mqttChannels[CARRO_PESO_TOPIC]["conectado"],
+                    onChanged: mqttTopicSubscription(CARRO_PESO_TOPIC)),
+                Text("${mqttChannels[CARRO_PESO_TOPIC]["nombre"]}: "
+                    .toUpperCase()),
+                Text(mqttChannels[CARRO_PESO_TOPIC]["valor"])
+              ],
+            )
+            // Expanded(
+            //     child: ListView.builder(
+            //         itemCount: testTopic.length,
+            //         itemBuilder: (context, index) {
+            //           return Text(testTopic[index]);
+            //         }))
           ],
         ),
       ),
